@@ -1,0 +1,2107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Widget App Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            color: white;
+        }
+
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 模拟手机外框 */
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background-color: #000;
+            border-radius: 40px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 0 0 12px #333, 0 0 0 13px #000;
+            margin: 20px auto;
+        }
+
+        /* 顶部刘海占位 */
+        .notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background-color: #000;
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
+            z-index: 50;
+        }
+
+        /* 页面切换动画 */
+        .page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+        .page.hidden-right {
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .page.hidden-left {
+            transform: translateX(-30%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .page.active {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 宠物动画状态 */
+        .pet-animation {
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+        }
+        .pet-animation.active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        /* 伸懒腰动画 */
+        @keyframes stretch {
+            0%, 100% { transform: scaleX(1) scaleY(1); }
+            25% { transform: scaleX(1.2) scaleY(0.85); }
+            50% { transform: scaleX(0.9) scaleY(1.15); }
+            75% { transform: scaleX(1.1) scaleY(0.95); }
+        }
+        .animate-stretch { animation: stretch 2s ease-in-out infinite; }
+
+        /* 摇尾巴动画 */
+        @keyframes wag-tail {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+        }
+        .animate-wag { animation: wag-tail 0.3s ease-in-out infinite; transform-origin: bottom center; }
+
+        /* 叼饭碗动画 */
+        @keyframes bob {
+            0%, 100% { transform: translateY(0) rotate(-3deg); }
+            50% { transform: translateY(-8px) rotate(3deg); }
+        }
+        .animate-bob { animation: bob 1s ease-in-out infinite; }
+
+        /* 回头看动画 */
+        @keyframes look-back {
+            0%, 70%, 100% { transform: rotate(0deg); }
+            80%, 90% { transform: rotate(-15deg); }
+        }
+        .animate-look-back { animation: look-back 2.5s ease-in-out infinite; }
+
+        /* 挖洞动画 */
+        @keyframes dig {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(3px) rotate(-10deg); }
+            50% { transform: translateY(-2px) rotate(5deg); }
+            75% { transform: translateY(3px) rotate(-8deg); }
+        }
+        .animate-dig { animation: dig 0.5s ease-in-out infinite; }
+
+        /* 追蝴蝶动画 */
+        @keyframes chase {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(8px); }
+            50% { transform: translateX(-5px); }
+            75% { transform: translateX(10px); }
+        }
+        .animate-chase { animation: chase 1s ease-in-out infinite; }
+
+        /* 蝴蝶飞舞 */
+        @keyframes flutter {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(10px, -8px) rotate(10deg); }
+            50% { transform: translate(5px, -12px) rotate(-5deg); }
+            75% { transform: translate(-5px, -6px) rotate(8deg); }
+        }
+        .animate-flutter { animation: flutter 2s ease-in-out infinite; }
+
+        /* 点击切换时的弹跳效果 */
+        @keyframes bounce-in {
+            0% { transform: scale(0.5) translateY(30px); opacity: 0; }
+            60% { transform: scale(1.1) translateY(-5px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .bounce-in { animation: bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+        /* Widget 点击态 */
+        .widget-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .widget-card:hover { transform: scale(1.01); }
+        .widget-card:active { transform: scale(0.98); }
+
+        /* 涟漪效果 */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(0);
+            animation: ripple-effect 0.6s linear;
+            pointer-events: none;
+        }
+        @keyframes ripple-effect {
+            to { transform: scale(4); opacity: 0; }
+        }
+        
+        /* 标注样式 */
+        .annotation-box {
+            position: absolute;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00eaff;
+            color: #00eaff;
+            padding: 10px 14px;
+            font-size: 12px;
+            border-radius: 6px;
+            max-width: 240px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* 玻璃拟态 - 深色版 */
+        .glass-panel-dark {
+            background: linear-gradient(135deg, rgba(40, 40, 50, 0.9) 0%, rgba(25, 25, 35, 0.95) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 指示点样式 */
+        .indicator-dot {
+            transition: all 0.3s ease;
+        }
+        .indicator-dot.active {
+            background-color: #FBBF24;
+            transform: scale(1.3);
+        }
+
+        /* Create 按钮悬浮效果 */
+        .create-btn {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
+        }
+        .create-btn:active { transform: translateY(0); }
+
+        /* ========== 预览页样式 ========== */
+        
+        /* 模糊背景 */
+        .blur-bg {
+            background: linear-gradient(135deg, 
+                rgba(251, 191, 36, 0.15) 0%, 
+                rgba(245, 158, 11, 0.1) 25%,
+                rgba(139, 92, 246, 0.1) 50%,
+                rgba(236, 72, 153, 0.1) 75%,
+                rgba(251, 191, 36, 0.15) 100%);
+        }
+
+        /* 横向滚动吸附 */
+        .snap-container {
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .snap-item { scroll-snap-align: center; }
+
+        /* 大数字渐变 */
+        .big-number {
+            background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.5));
+        }
+
+        /* 银色渐变 */
+        .silver-number {
+            background: linear-gradient(135deg, #E5E7EB 0%, #9CA3AF 50%, #6B7280 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 10px rgba(156, 163, 175, 0.3));
+        }
+
+        /* 玻璃卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 套餐卡片 */
+        .package-card {
+            transition: all 0.3s ease;
+        }
+        .package-card:hover {
+            transform: scale(1.02);
+        }
+        .package-card:active {
+            transform: scale(0.98);
+        }
+
+        /* ========== 4:2 Widget 预览样式 ========== */
+        .widget-preview-card {
+            position: relative;
+            background: linear-gradient(145deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.98) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+            display: flex;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .widget-preview-card:hover {
+            transform: scale(1.02);
+        }
+        
+        /* 卡片内部布局 */
+        .card-left {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+        .card-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* ========== 1:1 动画卡片轮播 ========== */
+        .anim-card {
+            background: linear-gradient(145deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.98) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 200, 50, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.4s ease;
+        }
+        .anim-card.dragging {
+            transition: none !important;
+            cursor: grabbing;
+        }
+        
+        /* 滑动飞走动画 */
+        .anim-card.fly-left {
+            animation: flyLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        .anim-card.fly-right {
+            animation: flyRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        @keyframes flyLeft {
+            0% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
+            100% { transform: translateX(-120%) rotate(-25deg) scale(0.8); opacity: 0; }
+        }
+        @keyframes flyRight {
+            0% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
+            100% { transform: translateX(120%) rotate(25deg) scale(0.8); opacity: 0; }
+        }
+        
+        /* 新卡片飞入动画 */
+        .anim-card.fly-in-from-right {
+            animation: flyInFromRight 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+        .anim-card.fly-in-from-left {
+            animation: flyInFromLeft 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+        @keyframes flyInFromRight {
+            0% { transform: translateX(80%) rotate(15deg) scale(0.9); opacity: 0; }
+            100% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
+        }
+        @keyframes flyInFromLeft {
+            0% { transform: translateX(-80%) rotate(-15deg) scale(0.9); opacity: 0; }
+            100% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
+        }
+        
+        /* 书页堆叠效果 */
+        .book-page-left, .book-page-right {
+            background: linear-gradient(145deg, rgba(35, 35, 48, 0.4) 0%, rgba(22, 22, 30, 0.5) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            pointer-events: none;
+            transition: all 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .book-page-left {
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+        }
+        .book-page-right {
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* 书页跟随动画 - 向左滑时右边书页整体向左移动跟上 */
+        .book-pages-follow-left .book-page-right {
+            transform: translateX(-15px) scale(1.03) !important;
+            opacity: 0.7 !important;
+        }
+        
+        /* 书页跟随动画 - 向右滑时左边书页整体向右移动跟上 */
+        .book-pages-follow-right .book-page-left {
+            transform: translateX(15px) scale(1.03) !important;
+            opacity: 0.7 !important;
+        }
+        
+        /* 轮播指示点 */
+        .carousel-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .carousel-dot.active {
+            width: 20px;
+            border-radius: 3px;
+            background: #FBBF24;
+        }
+
+        /* 预览组件容器 */
+        .preview-widget {
+            background: linear-gradient(145deg, rgba(30, 30, 40, 0.9) 0%, rgba(20, 20, 30, 0.95) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        /* Best Value 角标 */
+        .best-value-badge {
+            background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+            z-index: 30;
+        }
+
+        /* Add Widget 按钮 */
+        .add-widget-btn {
+            background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+            box-shadow: 0 8px 25px rgba(251, 191, 36, 0.4);
+            transition: all 0.3s ease;
+        }
+        .add-widget-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(251, 191, 36, 0.5);
+        }
+        .add-widget-btn:active { transform: translateY(0); }
+
+        /* 次级按钮 */
+        .add-widget-btn-secondary {
+            background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%);
+            box-shadow: 0 8px 20px rgba(107, 114, 128, 0.3);
+        }
+
+        /* 页面指示器 */
+        .page-dot {
+            transition: all 0.3s ease;
+        }
+        .page-dot.active {
+            width: 24px;
+            background-color: #FBBF24;
+        }
+
+        /* ========== 上传页样式 ========== */
+        
+        /* 上传卡片 */
+        .upload-card {
+            background: rgba(40, 40, 45, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .upload-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .upload-card.selected {
+            border-color: #22C55E;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+        }
+
+        /* 虚线上传框 */
+        .upload-dashed {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .upload-dashed:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* 图片网格 */
+        .photo-grid-item {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .photo-grid-item:hover {
+            transform: scale(1.02);
+        }
+        .photo-grid-item.selected {
+            outline: 3px solid #22C55E;
+            outline-offset: -3px;
+        }
+
+        /* Do/Don't 示例卡片 */
+        .example-card {
+            background: rgba(40, 40, 45, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Continue 按钮 */
+        .continue-btn {
+            background: #FBBF24;
+            transition: all 0.3s ease;
+        }
+        .continue-btn:hover {
+            background: #F59E0B;
+            transform: translateY(-2px);
+        }
+        .continue-btn:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.3);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Create 按钮 (灰色禁用态) */
+        .create-btn-disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 抖动动画 (iOS 编辑模式) */
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-2deg); }
+            50% { transform: rotate(2deg); }
+        }
+        .animate-wiggle {
+            animation: wiggle 0.15s ease-in-out infinite;
+        }
+
+        /* ========== Profile 页面样式 ========== */
+        
+        /* 瀑布流网格 */
+        .masonry-grid {
+            column-count: 2;
+            column-gap: 8px;
+        }
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 8px;
+        }
+
+        /* 生成中进度条动画 */
+        @keyframes progress-shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+        .progress-shimmer {
+            animation: progress-shimmer 1.5s ease-in-out infinite;
+        }
+
+        /* Widget 专属标识图标 */
+        .widget-icon-badge {
+            background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+            box-shadow: 0 2px 6px rgba(251, 191, 36, 0.4);
+        }
+
+        /* Tab 按钮样式 */
+        .profile-tab {
+            transition: all 0.3s ease;
+        }
+        .profile-tab.active {
+            color: white;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="relative flex justify-center">
+        
+        <!-- 手机屏幕 -->
+        <div class="phone-frame">
+            
+            <!-- ==================== 首页 (Page 1) ==================== -->
+            <div id="page-home" class="page active flex flex-col bg-black">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部导航栏 (Header) -->
+                <div class="flex justify-between items-center px-5 py-2 z-30">
+                    <div class="bg-yellow-400 text-black px-3 py-1 rounded-full font-bold text-sm flex items-center">
+                        🐾 Pro
+                    </div>
+                    <div class="w-8"></div>
+                </div>
+
+                <!-- 可滚动内容区 -->
+                <div class="flex-1 overflow-y-auto no-scrollbar pb-24 relative">
+                    
+                    <!-- 1. 轮播图区域 -->
+                    <div class="mt-4 mb-6 relative h-[320px] w-full overflow-hidden">
+                        <div class="absolute left-[-30px] top-6 w-[140px] h-[260px] rounded-2xl overflow-hidden opacity-60 transform scale-90 brightness-50">
+                             <img src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover">
+                        </div>
+                        
+                        <div class="absolute left-[50%] top-0 ml-[-90px] w-[180px] h-[320px] rounded-3xl overflow-hidden shadow-2xl z-20 border-2 border-yellow-400/50">
+                            <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover">
+                            <div class="absolute top-8 w-full text-center">
+                                <div class="text-white/80 text-xs font-medium">Thu Nov 27</div>
+                                <div class="text-white text-6xl font-bold tracking-tighter opacity-90">10:14</div>
+                            </div>
+                            <div class="absolute bottom-4 w-full px-4 flex justify-between text-white/80">
+                                <div class="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-[10px]">🔦</div>
+                                <div class="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-[10px]">📷</div>
+                            </div>
+                        </div>
+
+                        <div class="absolute right-[-30px] top-6 w-[140px] h-[260px] rounded-2xl overflow-hidden opacity-60 transform scale-90 brightness-50">
+                            <img src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+
+                    <!-- 2. Widget 模块 -->
+                    <div class="px-5 mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-xl font-bold text-white">Widget</h2>
+                            </div>
+                            <!-- Create 按钮 -->
+                            <button id="btn-create" class="create-btn flex items-center gap-1.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-4 py-2 rounded-full font-bold text-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                <span>Create</span>
+                            </button>
+                        </div>
+
+                        <!-- 2.0版本：左右分栏 Widget 展示区 -->
+                        <div id="pet-widget" class="widget-card w-full h-[180px] glass-panel-dark rounded-3xl relative overflow-hidden flex">
+                            
+                            <!-- 左侧：宠物动画区（自动轮播，共6个动画） -->
+                            <div id="pet-section" class="flex-1 relative flex items-center justify-center border-r border-white/10">
+                                <!-- 背景光效 -->
+                                <div class="absolute inset-0 opacity-20">
+                                    <div class="absolute top-4 left-4 w-16 h-16 bg-yellow-400/40 rounded-full blur-2xl"></div>
+                                    <div class="absolute bottom-4 right-4 w-12 h-12 bg-orange-400/30 rounded-full blur-2xl"></div>
+                                </div>
+                                
+                                <!-- 动画内容（6个动画） -->
+                                <div class="relative flex flex-col items-center justify-center">
+                                    <!-- 1. Stretch 伸懒腰 -->
+                                    <div id="home-anim-0" class="pet-animation active">
+                                        <div class="text-6xl animate-stretch select-none">🐕</div>
+                                    </div>
+                                    <!-- 2. Sock Thief 叼袜子 -->
+                                    <div id="home-anim-1" class="pet-animation">
+                                        <div class="relative">
+                                            <div class="text-6xl animate-wag select-none">🐕</div>
+                                            <div class="absolute -right-3 top-1 text-2xl transform rotate-12">🧦</div>
+                                        </div>
+                                    </div>
+                                    <!-- 3. Hungry 叼饭碗 -->
+                                    <div id="home-anim-2" class="pet-animation">
+                                        <div class="relative animate-bob">
+                                            <div class="text-6xl select-none">🐕</div>
+                                            <div class="absolute -right-2 bottom-0 text-3xl">🍚</div>
+                                        </div>
+                                    </div>
+                                    <!-- 4. Oops 回头看 -->
+                                    <div id="home-anim-3" class="pet-animation">
+                                        <div class="text-6xl animate-look-back select-none">🐕</div>
+                                    </div>
+                                    <!-- 5. Digging 挖洞 -->
+                                    <div id="home-anim-4" class="pet-animation">
+                                        <div class="relative">
+                                            <div class="text-6xl animate-dig select-none">🐕</div>
+                                            <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 text-lg">💨</div>
+                                        </div>
+                                    </div>
+                                    <!-- 6. Butterfly Chase 追蝴蝶 -->
+                                    <div id="home-anim-5" class="pet-animation">
+                                        <div class="relative">
+                                            <div class="text-6xl animate-chase select-none">🐕</div>
+                                            <div class="absolute -top-4 -right-2 text-2xl animate-flutter">🦋</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 动画指示点（6个） -->
+                                <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1">
+                                    <div id="home-dot-0" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30 active"></div>
+                                    <div id="home-dot-1" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                                    <div id="home-dot-2" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                                    <div id="home-dot-3" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                                    <div id="home-dot-4" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                                    <div id="home-dot-5" class="indicator-dot w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- 右侧：时间展示区 -->
+                            <div id="time-section" class="flex-1 relative flex items-center justify-center">
+                                <!-- 背景光效 -->
+                                <div class="absolute inset-0 opacity-15">
+                                    <div class="absolute top-6 right-6 w-20 h-20 bg-blue-400/30 rounded-full blur-3xl"></div>
+                                    <div class="absolute bottom-4 left-4 w-14 h-14 bg-purple-400/20 rounded-full blur-2xl"></div>
+                                </div>
+                                
+                                <!-- 时间内容 -->
+                                <div class="relative flex flex-col items-center justify-center text-center">
+                                    <!-- 日期 -->
+                                    <div class="text-white/50 text-[10px] font-medium tracking-wider mb-1">
+                                        <span id="widget-year">2024</span>.<span id="widget-month">12</span>.<span id="widget-day">24</span>
+                                    </div>
+                                    <!-- 时间 -->
+                                    <div class="flex items-baseline gap-0.5">
+                                        <span id="widget-hour" class="text-4xl font-bold text-white tracking-tight">14</span>
+                                        <span class="text-2xl font-light text-white/60 animate-pulse">:</span>
+                                        <span id="widget-minute" class="text-4xl font-bold text-white tracking-tight">30</span>
+                                    </div>
+                                    <!-- 星期 -->
+                                    <div class="mt-1.5 text-[10px] text-white/40 font-medium uppercase tracking-widest">
+                                        <span id="widget-weekday">Tuesday</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- 3. 列表部分 -->
+                    <div class="px-5 mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-lg text-white">Photo Theme Title</h3>
+                            <span class="text-xs text-white/60">See All ></span>
+                        </div>
+                        <div class="flex gap-3 overflow-x-auto no-scrollbar">
+                            <div class="w-[100px] h-[180px] bg-gray-800 rounded-xl flex-shrink-0 overflow-hidden opacity-80">
+                                 <img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                            </div>
+                             <div class="w-[100px] h-[180px] bg-gray-800 rounded-xl flex-shrink-0 overflow-hidden opacity-80">
+                                 <img src="https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                            </div>
+                             <div class="w-[100px] h-[180px] bg-gray-800 rounded-xl flex-shrink-0 overflow-hidden opacity-80">
+                                 <img src="https://images.unsplash.com/photo-1592194996308-7b43878e84a6?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 底部导航栏 -->
+                <div class="absolute bottom-0 w-full h-20 bg-black/90 backdrop-blur-md border-t border-white/10 flex justify-around items-start pt-4 z-50">
+                    <button id="tab-wallpaper" class="tab-btn flex flex-col items-center gap-1 text-yellow-400">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75 3.54-1.96-2.36L6.5 17h11l-3.54-4.71z"/></svg>
+                        <span class="text-[10px]">Wallpaper</span>
+                    </button>
+                    <button id="tab-discovered" class="tab-btn flex flex-col items-center gap-1 text-gray-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                        <span class="text-[10px]">Discovered</span>
+                    </button>
+                    <button id="tab-profile" class="tab-btn flex flex-col items-center gap-1 text-gray-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span class="text-[10px]">Profile</span>
+                    </button>
+                </div>
+                
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+            <!-- ==================== 预览页 (Page 2) - 2.0版本 ==================== -->
+            <div id="page-preview" class="page hidden-right flex flex-col blur-bg">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部导航栏 -->
+                <div class="flex justify-between items-center px-5 py-3 z-30">
+                    <button id="btn-back" class="flex items-center gap-1 text-white/80 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        <span class="text-sm font-medium">Back</span>
+                    </button>
+                    <h1 class="text-lg font-bold">Create Widget</h1>
+                    <div class="w-16"></div>
+                </div>
+
+                <!-- 主内容区（新布局：1:1动画 + 4:2预览联动） -->
+                <div class="flex-1 flex flex-col px-4 pb-24 overflow-hidden">
+                    
+                    <!-- 顶部 1:1 动画卡片区（层叠滑动） -->
+                    <div class="relative" style="height: 260px; flex-shrink: 0;">
+                        <div id="animation-carousel" class="relative w-full h-full flex items-center justify-center overflow-visible">
+                            <!-- 左侧书页堆叠效果 -->
+                            <div class="book-page-left absolute rounded-2xl" style="left: 50%; margin-left: -125px; width: 230px; height: 230px; transform: translateX(-8px); z-index: 1;"></div>
+                            <div class="book-page-left absolute rounded-2xl" style="left: 50%; margin-left: -122px; width: 230px; height: 230px; transform: translateX(-5px); z-index: 2;"></div>
+                            <div class="book-page-left absolute rounded-2xl" style="left: 50%; margin-left: -119px; width: 230px; height: 230px; transform: translateX(-2px); z-index: 3;"></div>
+                            
+                            <!-- 中间主卡片（更大，展示完整动画） -->
+                            <div id="card-center" class="anim-card absolute w-[230px] h-[230px] rounded-3xl overflow-hidden cursor-grab shadow-2xl" style="z-index: 10;"></div>
+                            
+                            <!-- 右侧书页堆叠效果 -->
+                            <div class="book-page-right absolute rounded-2xl" style="right: 50%; margin-right: -119px; width: 230px; height: 230px; transform: translateX(2px); z-index: 3;"></div>
+                            <div class="book-page-right absolute rounded-2xl" style="right: 50%; margin-right: -122px; width: 230px; height: 230px; transform: translateX(5px); z-index: 2;"></div>
+                            <div class="book-page-right absolute rounded-2xl" style="right: 50%; margin-right: -125px; width: 230px; height: 230px; transform: translateX(8px); z-index: 1;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 指示点 -->
+                    <div class="flex justify-center gap-1.5 py-2" style="flex-shrink: 0;">
+                        <div id="carousel-dots" class="flex gap-1.5"></div>
+                    </div>
+
+                    <!-- 下方 4:2 Widget 预览（联动变化） -->
+                    <div class="flex-1 flex flex-col items-center justify-center min-h-0">
+                        <div class="text-center text-[10px] text-white/40 mb-2 uppercase tracking-wider">Widget Preview</div>
+                        <div id="widget-preview" class="widget-preview-card mx-auto" style="width: 320px; height: 160px;">
+                            <!-- 由JS生成 -->
+                        </div>
+                        <!-- 滑动提示 -->
+                        <div class="flex items-center gap-2 mt-3 text-white/30 text-xs">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18"/>
+                            </svg>
+                            <span>Swipe above to preview</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 底部固定 Create 按钮 + 特惠气泡 -->
+                <div class="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/90 to-transparent z-40">
+                    <div class="relative">
+                        <!-- 特惠气泡 -->
+                        <div class="absolute -top-8 right-2 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg animate-bounce">
+                            🔥 50% OFF
+                            <!-- 气泡小尾巴 -->
+                            <div class="absolute -bottom-1 right-4 w-2 h-2 bg-pink-500 transform rotate-45"></div>
+                        </div>
+                        <button id="btn-preview-create" class="add-widget-btn w-full py-4 rounded-2xl text-black font-bold text-lg flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Create
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ==================== 上传页 (Page 3) ==================== -->
+            <div id="page-upload" class="page hidden-right flex flex-col bg-[#0a0a0f]">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部导航栏 -->
+                <div class="flex justify-between items-center px-5 py-3 z-30">
+                    <button id="btn-back-upload" class="flex items-center gap-1 text-white/80 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <h1 class="text-lg font-bold">Upload Photo</h1>
+                    <div class="w-8"></div>
+                </div>
+
+                <!-- 可滚动内容区 -->
+                <div class="flex-1 overflow-y-auto no-scrollbar px-5 pb-32">
+                    
+                    <!-- Approved photo 区域 -->
+                    <div class="mb-8">
+                        <h3 class="text-white font-semibold text-base mb-4">Approved photo</h3>
+                        <div class="flex gap-3">
+                            <!-- 已通过的照片 1 -->
+                            <div class="upload-card w-[100px] h-[100px] rounded-2xl overflow-hidden relative">
+                                <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                                <!-- 扫描图标 -->
+                                <div class="absolute bottom-2 right-2 w-6 h-6 bg-black/50 backdrop-blur-sm rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 4H4v3M17 4h3v3M7 20H4v-3M17 20h3v-3M9 9h6v6H9z"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- 已通过的照片 2 -->
+                            <div class="upload-card w-[100px] h-[100px] rounded-2xl overflow-hidden relative">
+                                <img src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                                <!-- 扫描图标 -->
+                                <div class="absolute bottom-2 right-2 w-6 h-6 bg-black/50 backdrop-blur-sm rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 4H4v3M17 4h3v3M7 20H4v-3M17 20h3v-3M9 9h6v6H9z"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- 添加更多照片按钮 -->
+                            <div id="pet-upload-card" class="upload-card w-[100px] h-[100px] rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-gray-800/50 border border-white/10 hover:border-white/20 transition-colors">
+                                <!-- 狗狗剪影 + 加号 -->
+                                <div class="relative">
+                                    <div class="text-4xl opacity-30">🐕</div>
+                                    <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-gray-700 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white/60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rejected photos 区域 -->
+                    <div class="mb-6">
+                        <h3 class="text-white font-semibold text-base mb-4">Rejected photos</h3>
+                        <div class="flex gap-3">
+                            <!-- 被拒绝的照片 1 -->
+                            <div class="flex flex-col items-center">
+                                <div class="w-[100px] h-[100px] rounded-2xl overflow-hidden relative">
+                                    <img src="https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                                    <!-- 感叹号角标 -->
+                                    <div class="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <!-- Not detected 标签 -->
+                                <div class="mt-2 px-2 py-1 bg-red-500/20 rounded-full">
+                                    <span class="text-red-400 text-[10px] font-medium">Not detected</span>
+                                </div>
+                            </div>
+
+                            <!-- 被拒绝的照片 2 -->
+                            <div class="flex flex-col items-center">
+                                <div class="w-[100px] h-[100px] rounded-2xl overflow-hidden relative">
+                                    <img src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                                    <!-- 感叹号角标 -->
+                                    <div class="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <!-- Not detected 标签 -->
+                                <div class="mt-2 px-2 py-1 bg-red-500/20 rounded-full">
+                                    <span class="text-red-400 text-[10px] font-medium">Not detected</span>
+                                </div>
+                            </div>
+
+                            <!-- 被拒绝的照片 3 -->
+                            <div class="flex flex-col items-center">
+                                <div class="w-[100px] h-[100px] rounded-2xl overflow-hidden relative">
+                                    <img src="https://images.unsplash.com/photo-1558788353-f76d92427f16?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover">
+                                    <!-- 感叹号角标 -->
+                                    <div class="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <!-- Not detected 标签 -->
+                                <div class="mt-2 px-2 py-1 bg-red-500/20 rounded-full">
+                                    <span class="text-red-400 text-[10px] font-medium">Not detected</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 底部 Continue 按钮 -->
+                <div class="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f] to-transparent pt-10">
+                    <button id="btn-create-final" class="continue-btn w-full py-4 rounded-full text-black font-bold text-lg">
+                        Continue
+                    </button>
+                </div>
+
+                <!-- 底部 Home Indicator -->
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+            <!-- ==================== 生成结果页 (Page 4) ==================== -->
+            <div id="page-result" class="page hidden-right flex flex-col bg-[#0a0a0f]">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部标题 -->
+                <div class="flex justify-center items-center py-4 z-30">
+                    <h1 class="text-xl font-bold">Your Widget is Ready! 🎉</h1>
+                </div>
+
+                <!-- 中间内容区 -->
+                <div class="flex-1 flex flex-col items-center justify-center px-5">
+                    
+                    <!-- 成功提示 -->
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <p class="text-white/60 text-sm">Widget generated successfully!</p>
+                    </div>
+
+                    <!-- 正方形小组件预览 -->
+                    <div class="preview-widget w-[260px] h-[260px] rounded-3xl relative overflow-hidden mb-8">
+                        <div class="absolute inset-0 flex items-center justify-center flex-col">
+                            <div class="text-8xl animate-stretch select-none mb-4">🐕</div>
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-white">Buddy</div>
+                                <div class="text-xs text-white/50">Good morning vibes</div>
+                            </div>
+                        </div>
+                        <!-- 装饰背景 -->
+                        <div class="absolute inset-0 opacity-20 pointer-events-none">
+                            <div class="absolute top-4 left-4 w-20 h-20 bg-yellow-400/40 rounded-full blur-3xl"></div>
+                            <div class="absolute bottom-4 right-4 w-16 h-16 bg-orange-400/40 rounded-full blur-3xl"></div>
+                        </div>
+                    </div>
+
+                    <!-- 提示文字 -->
+                    <p class="text-white/40 text-xs text-center max-w-[250px]">
+                        Tap "Continue" to learn how to add this widget to your home screen
+                    </p>
+
+                </div>
+
+                <!-- 底部 Continue 按钮 -->
+                <div class="p-5">
+                    <button id="btn-continue-result" class="continue-btn w-full py-4 rounded-full text-black font-bold text-lg">
+                        Continue
+                    </button>
+                </div>
+
+                <!-- 底部 Home Indicator -->
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+            <!-- ==================== 引导页 (Page 5) ==================== -->
+            <div id="page-guide" class="page hidden-right flex flex-col bg-[#0a0a0f]">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部标题 -->
+                <div class="flex justify-between items-center px-5 py-3 z-30">
+                    <button id="btn-skip-guide" class="text-white/50 text-sm">Skip</button>
+                    <h1 class="text-lg font-bold">Add to Home Screen</h1>
+                    <div class="w-8"></div>
+                </div>
+
+                <!-- 引导图滑动容器 -->
+                <div id="guide-scroll-container" class="flex-1 overflow-x-auto overflow-y-hidden snap-container no-scrollbar flex">
+                    
+                    <!-- 引导页 1: 长按主屏幕 -->
+                    <div class="snap-item flex-shrink-0 w-full flex flex-col items-center px-8 pt-4">
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <!-- 模拟 iPhone 主屏幕 -->
+                            <div class="w-[200px] h-[360px] bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 rounded-[30px] relative overflow-hidden shadow-2xl mb-6 border-4 border-gray-800">
+                                <!-- 模拟 App 图标网格 -->
+                                <div class="absolute top-12 left-0 right-0 px-4">
+                                    <div class="grid grid-cols-4 gap-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-blue-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-red-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-yellow-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-pink-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-indigo-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-orange-500 rounded-xl"></div>
+                                        <div class="w-10 h-10 bg-teal-500 rounded-xl"></div>
+                                    </div>
+                                </div>
+                                <!-- 长按手势指示 -->
+                                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                                    <div class="w-16 h-16 border-4 border-white/50 rounded-full flex items-center justify-center animate-pulse">
+                                        <div class="w-8 h-8 bg-white/30 rounded-full"></div>
+                                    </div>
+                                </div>
+                                <!-- 抖动效果提示 -->
+                                <div class="absolute bottom-16 left-0 right-0 text-center">
+                                    <div class="text-white/60 text-[10px]">Apps will jiggle</div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-white mb-2">Step 1</div>
+                                <div class="text-white/60 text-sm">Long press on your home screen<br/>until apps start to jiggle</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 引导页 2: 点击 + 按钮 -->
+                    <div class="snap-item flex-shrink-0 w-full flex flex-col items-center px-8 pt-4">
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <!-- 模拟 iPhone 编辑模式 -->
+                            <div class="w-[200px] h-[360px] bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 rounded-[30px] relative overflow-hidden shadow-2xl mb-6 border-4 border-gray-800">
+                                <!-- 左上角 + 按钮 -->
+                                <div class="absolute top-3 left-3 w-8 h-8 bg-gray-800/80 rounded-full flex items-center justify-center border-2 border-yellow-400 animate-pulse">
+                                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                </div>
+                                <!-- 抖动的 App 图标 -->
+                                <div class="absolute top-14 left-0 right-0 px-4">
+                                    <div class="grid grid-cols-4 gap-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-xl relative animate-wiggle">
+                                            <div class="absolute -top-1 -left-1 w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center">
+                                                <span class="text-white text-[8px]">−</span>
+                                            </div>
+                                        </div>
+                                        <div class="w-10 h-10 bg-blue-500 rounded-xl relative animate-wiggle" style="animation-delay: 0.1s">
+                                            <div class="absolute -top-1 -left-1 w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center">
+                                                <span class="text-white text-[8px]">−</span>
+                                            </div>
+                                        </div>
+                                        <div class="w-10 h-10 bg-red-500 rounded-xl relative animate-wiggle" style="animation-delay: 0.2s">
+                                            <div class="absolute -top-1 -left-1 w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center">
+                                                <span class="text-white text-[8px]">−</span>
+                                            </div>
+                                        </div>
+                                        <div class="w-10 h-10 bg-yellow-500 rounded-xl relative animate-wiggle" style="animation-delay: 0.3s">
+                                            <div class="absolute -top-1 -left-1 w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center">
+                                                <span class="text-white text-[8px]">−</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 箭头指向 + -->
+                                <div class="absolute top-10 left-14 text-yellow-400 text-2xl">←</div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-white mb-2">Step 2</div>
+                                <div class="text-white/60 text-sm">Tap the <span class="text-yellow-400 font-bold">+</span> button in the<br/>top left corner</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 引导页 3: 搜索并添加 Widget -->
+                    <div class="snap-item flex-shrink-0 w-full flex flex-col items-center px-8 pt-4">
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <!-- 模拟 Widget 选择界面 -->
+                            <div class="w-[200px] h-[360px] bg-gray-900 rounded-[30px] relative overflow-hidden shadow-2xl mb-6 border-4 border-gray-800">
+                                <!-- 搜索栏 -->
+                                <div class="absolute top-4 left-3 right-3">
+                                    <div class="bg-gray-800 rounded-lg px-3 py-2 flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                        <span class="text-gray-500 text-xs">Pet Widget</span>
+                                    </div>
+                                </div>
+                                <!-- Widget 列表 -->
+                                <div class="absolute top-16 left-3 right-3 space-y-2">
+                                    <div class="bg-yellow-400/20 border-2 border-yellow-400 rounded-xl p-2 flex items-center gap-3">
+                                        <div class="w-12 h-12 bg-yellow-400 rounded-xl flex items-center justify-center text-2xl">🐕</div>
+                                        <div>
+                                            <div class="text-white text-xs font-bold">Pet Widget</div>
+                                            <div class="text-white/50 text-[10px]">Your cute companion</div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-800 rounded-xl p-2 flex items-center gap-3 opacity-50">
+                                        <div class="w-12 h-12 bg-gray-700 rounded-xl"></div>
+                                        <div>
+                                            <div class="text-white text-xs font-bold">Weather</div>
+                                            <div class="text-white/50 text-[10px]">Current conditions</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 底部添加按钮 -->
+                                <div class="absolute bottom-4 left-3 right-3">
+                                    <div class="bg-yellow-400 rounded-xl py-2 text-center text-black font-bold text-sm">
+                                        Add Widget
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-white mb-2">Step 3</div>
+                                <div class="text-white/60 text-sm">Search for <span class="text-yellow-400 font-bold">"Pet Widget"</span><br/>and tap to add it</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 引导页指示器 -->
+                <div class="flex justify-center gap-2 py-4">
+                    <div id="guide-dot-0" class="w-6 h-2 rounded-full bg-yellow-400 transition-all"></div>
+                    <div id="guide-dot-1" class="w-2 h-2 rounded-full bg-white/30 transition-all"></div>
+                    <div id="guide-dot-2" class="w-2 h-2 rounded-full bg-white/30 transition-all"></div>
+                </div>
+
+                <!-- 底部按钮 -->
+                <div class="p-5">
+                    <button id="btn-done-guide" class="continue-btn w-full py-4 rounded-full text-black font-bold text-lg opacity-50" disabled>
+                        Done
+                    </button>
+                </div>
+
+                <!-- 底部 Home Indicator -->
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+            <!-- ==================== Profile 页面 (Page 6) ==================== -->
+            <div id="page-profile" class="page hidden-right flex flex-col blur-bg">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部 Tab 栏 -->
+                <div class="flex justify-between items-center px-5 py-3 z-30">
+                    <div class="flex items-center gap-4">
+                        <button id="profile-tab-all" class="profile-tab text-white font-semibold text-lg">All</button>
+                        <button id="profile-tab-mylikes" class="profile-tab text-gray-500 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                            <span class="text-sm">Mylikes</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- 罐头余额 -->
+                        <div class="flex items-center gap-1 bg-yellow-400/20 px-2.5 py-1 rounded-full">
+                            <span class="text-lg">🥫</span>
+                            <span class="text-yellow-400 font-bold text-sm">99</span>
+                        </div>
+                        <!-- 菜单 -->
+                        <button class="text-white/60">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 内容区域 - 瀑布流 -->
+                <div class="flex-1 overflow-y-auto px-2 pb-24">
+                    <div class="masonry-grid">
+                        
+                        <!-- Widget 生成中 (第一个) -->
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden bg-gray-800/50">
+                                <!-- 模糊背景图 -->
+                                <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full aspect-square object-cover filter blur-sm opacity-60">
+                                <!-- 进度遮罩 -->
+                                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
+                                    <span class="text-white font-bold text-lg mb-2">32%</span>
+                                    <!-- 进度条 -->
+                                    <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden relative">
+                                        <div class="h-full bg-yellow-400 rounded-full" style="width: 32%"></div>
+                                        <!-- 笑脸指示器 -->
+                                        <div class="absolute top-1/2 -translate-y-1/2 text-lg" style="left: 28%">😊</div>
+                                    </div>
+                                    <span class="text-white/80 text-sm mt-2">creating...</span>
+                                </div>
+                                <!-- Widget 专属标识 -->
+                                <div class="absolute top-2 right-2 widget-icon-badge w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Widget 已完成 (第二个) - 可点击进入详情 -->
+                        <div class="masonry-item">
+                            <div id="widget-completed-item" class="relative rounded-2xl overflow-hidden cursor-pointer active:scale-95 transition-transform">
+                                <img src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full aspect-square object-cover">
+                                <!-- 时间显示 -->
+                                <div class="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-md">
+                                    <span class="text-white text-xs font-medium">10:14</span>
+                                </div>
+                                <!-- Widget 专属标识 -->
+                                <div class="absolute top-2 right-2 widget-icon-badge w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 视频项目 (带播放图标) -->
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full" style="aspect-ratio: 3/4; object-fit: cover;">
+                                <!-- 视频标识 -->
+                                <div class="absolute top-2 right-2 bg-black/50 w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 图片项目 (带图层图标) -->
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full aspect-square object-cover">
+                                <!-- 图层标识 -->
+                                <div class="absolute top-2 right-2 bg-black/50 w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 图片项目 (带钻石图标 - 壁纸) -->
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1592194996308-7b43878e84a6?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full" style="aspect-ratio: 4/5; object-fit: cover;">
+                                <!-- 壁纸标识 -->
+                                <div class="absolute top-2 right-2 bg-black/50 w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 更多图片项目 -->
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full" style="aspect-ratio: 3/4; object-fit: cover;">
+                                <div class="absolute top-2 right-2 bg-black/50 w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="masonry-item">
+                            <div class="relative rounded-2xl overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1574158622682-e40e69881006?q=80&w=400&auto=format&fit=crop" 
+                                     class="w-full aspect-square object-cover">
+                                <div class="absolute top-2 right-2 bg-black/50 w-6 h-6 rounded-md flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 底部导航栏 -->
+                <div class="absolute bottom-0 w-full h-20 bg-black/90 backdrop-blur-md border-t border-white/10 flex justify-around items-start pt-4 z-50">
+                    <button id="profile-tab-wallpaper" class="tab-btn flex flex-col items-center gap-1 text-gray-500">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75 3.54-1.96-2.36L6.5 17h11l-3.54-4.71z"/></svg>
+                        <span class="text-[10px]">Wallpaper</span>
+                    </button>
+                    <button id="profile-tab-discovered" class="tab-btn flex flex-col items-center gap-1 text-gray-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                        <span class="text-[10px]">Discovered</span>
+                    </button>
+                    <button id="profile-tab-profile-btn" class="tab-btn flex flex-col items-center gap-1 text-yellow-400">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span class="text-[10px]">Profile</span>
+                    </button>
+                </div>
+                
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+            <!-- ==================== Widget 详情页 (Page 7) ==================== -->
+            <div id="page-widget-detail" class="page hidden-right flex flex-col blur-bg">
+                
+                <!-- 刘海 & 状态栏 -->
+                <div class="notch"></div>
+                <div class="w-full h-12 flex justify-between items-center px-6 pt-2 text-white text-xs font-bold z-40">
+                    <span>9:41</span>
+                    <div class="flex space-x-1">
+                        <div class="w-4 h-3 bg-white rounded-[2px]"></div>
+                        <div class="w-0.5 h-3 bg-white rounded-[2px]"></div>
+                    </div>
+                </div>
+
+                <!-- 顶部导航栏 -->
+                <div class="flex justify-between items-center px-5 py-3 z-30">
+                    <button id="btn-back-widget-detail" class="flex items-center gap-1 text-white/80 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <h1 class="text-lg font-bold">My Widget</h1>
+                    <!-- 删除按钮 -->
+                    <button class="text-red-400 hover:text-red-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 内容区域 -->
+                <div class="flex-1 flex flex-col items-center px-5 py-4 overflow-y-auto no-scrollbar">
+                    
+                    <!-- 1:1 动画卡片展示区域 -->
+                    <div class="relative w-full max-w-[260px] mb-4">
+                        <!-- 图片容器 (1:1) -->
+                        <div id="widget-detail-gallery" class="relative aspect-square rounded-3xl overflow-hidden shadow-2xl">
+                            <!-- 图片1 (当前显示) -->
+                            <img id="detail-img-1" src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=600&auto=format&fit=crop" 
+                                 class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 opacity-100">
+                            <!-- 图片2 -->
+                            <img id="detail-img-2" src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=600&auto=format&fit=crop" 
+                                 class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 opacity-0">
+                            <!-- 图片3 -->
+                            <img id="detail-img-3" src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=600&auto=format&fit=crop" 
+                                 class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 opacity-0">
+                            <!-- 图片4 -->
+                            <img id="detail-img-4" src="https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=600&auto=format&fit=crop" 
+                                 class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 opacity-0">
+                            <!-- 时间显示 -->
+                            <div class="absolute top-3 left-3 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg z-10">
+                                <span class="text-white text-sm font-bold">10:14</span>
+                            </div>
+                        </div>
+
+                        <!-- 右侧操作按钮 -->
+                        <div class="absolute -right-12 top-1/2 -translate-y-1/2 flex flex-col gap-2">
+                            <!-- 点赞 -->
+                            <button id="btn-like-widget" class="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+                                </svg>
+                            </button>
+                            <!-- 踩 -->
+                            <button id="btn-dislike-widget" class="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-all">
+                                <svg class="w-4 h-4 rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+                                </svg>
+                            </button>
+                            <!-- Remake -->
+                            <button id="btn-remake-widget" class="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                <span class="text-[7px] text-yellow-400 font-medium">Remake</span>
+                            </button>
+                        </div>
+
+                        <!-- 底部指示点 -->
+                        <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+                            <div id="detail-dot-1" class="w-2 h-2 rounded-full bg-yellow-400 transition-all"></div>
+                            <div id="detail-dot-2" class="w-2 h-2 rounded-full bg-white/40 transition-all"></div>
+                            <div id="detail-dot-3" class="w-2 h-2 rounded-full bg-white/40 transition-all"></div>
+                            <div id="detail-dot-4" class="w-2 h-2 rounded-full bg-white/40 transition-all"></div>
+                        </div>
+                    </div>
+
+                    <!-- 4:2 Widget 样例预览 -->
+                    <div class="w-full max-w-[320px] mt-6">
+                        <div class="text-center text-[10px] text-white/40 mb-2 uppercase tracking-wider">Widget Preview</div>
+                        <div class="widget-preview-card mx-auto" style="width: 100%; height: 140px;">
+                            <!-- 左侧：动画区域 -->
+                            <div class="card-left">
+                                <div class="absolute inset-0 opacity-20">
+                                    <div class="absolute top-3 left-3 w-12 h-12 bg-yellow-400/40 rounded-full blur-2xl"></div>
+                                    <div class="absolute bottom-3 right-3 w-10 h-10 bg-orange-400/30 rounded-full blur-2xl"></div>
+                                </div>
+                                <div class="relative">
+                                    <div class="text-5xl animate-stretch select-none">🐕</div>
+                                </div>
+                            </div>
+                            <!-- 右侧：时间区域 -->
+                            <div class="card-right">
+                                <div class="absolute inset-0 opacity-15">
+                                    <div class="absolute top-4 right-4 w-14 h-14 bg-blue-400/30 rounded-full blur-2xl"></div>
+                                </div>
+                                <div class="relative text-center">
+                                    <div class="text-white/50 text-[9px] font-medium tracking-wider mb-0.5">2024.12.24</div>
+                                    <div class="flex items-baseline gap-0.5 justify-center">
+                                        <span class="text-3xl font-bold text-white tracking-tight">10</span>
+                                        <span class="text-xl font-light text-white/60">:</span>
+                                        <span class="text-3xl font-bold text-white tracking-tight">14</span>
+                                    </div>
+                                    <div class="text-[8px] text-white/40 font-medium uppercase tracking-widest mt-0.5">Tuesday</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 底部 Add Widget 按钮 -->
+                <div class="p-5 pb-8">
+                    <button class="add-widget-btn w-full py-4 rounded-2xl text-black font-bold text-lg flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Widget
+                    </button>
+                </div>
+
+                <!-- 底部 Home Indicator -->
+                <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full z-50"></div>
+
+            </div>
+
+        </div>
+
+        <!-- 交互标注 -->
+        <div id="annotations-home">
+            <div class="annotation-box" style="top: 420px; left: -260px;">
+                <h4 class="font-bold mb-2 text-yellow-400">🐕 Pet Animation Widget</h4>
+                <ul class="text-gray-300 space-y-1.5 text-[11px]">
+                    <li>✓ <b>长方形布局</b>：宽度撑满，高度 180px</li>
+                    <li>✓ <b>3 种动效</b>：伸懒腰 / 叼袜子 / 叼饭碗</li>
+                    <li>✓ <b>点击切换</b>：点击卡片切换到下一个动作</li>
+                </ul>
+            </div>
+
+            <div class="annotation-box" style="top: 340px; right: -220px;">
+                <h4 class="font-bold mb-2 text-green-400">➕ Create Button</h4>
+                <p class="text-gray-300 text-[11px] mb-2">点击进入预览页面（无跳转，页面切换）</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ========== 页面元素 ==========
+        const pageHome = document.getElementById('page-home');
+        const pagePreview = document.getElementById('page-preview');
+        const pageUpload = document.getElementById('page-upload');
+        const btnCreate = document.getElementById('btn-create');
+        const btnBack = document.getElementById('btn-back');
+        const btnBackUpload = document.getElementById('btn-back-upload');
+        const annotationsHome = document.getElementById('annotations-home');
+
+        // Add Widget 按钮们
+        const addWidgetBtns = document.querySelectorAll('.add-widget-btn, .add-widget-btn-secondary');
+
+        // ========== 首页 → 预览页 ==========
+        btnCreate.addEventListener('click', () => {
+            pageHome.classList.remove('active');
+            pageHome.classList.add('hidden-left');
+            pagePreview.classList.remove('hidden-right');
+            pagePreview.classList.add('active');
+            annotationsHome.style.display = 'none';
+        });
+
+        // ========== 预览页 → 首页 ==========
+        btnBack.addEventListener('click', () => {
+            pagePreview.classList.remove('active');
+            pagePreview.classList.add('hidden-right');
+            pageHome.classList.remove('hidden-left');
+            pageHome.classList.add('active');
+            annotationsHome.style.display = 'block';
+        });
+
+
+        // ========== 预览页 → 上传页 (Add Widget) ==========
+        addWidgetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                pagePreview.classList.remove('active');
+                pagePreview.classList.add('hidden-left');
+                pageUpload.classList.remove('hidden-right');
+                pageUpload.classList.add('active');
+            });
+        });
+
+        // ========== 上传页 → 预览页 ==========
+        btnBackUpload.addEventListener('click', () => {
+            pageUpload.classList.remove('active');
+            pageUpload.classList.add('hidden-right');
+            pagePreview.classList.remove('hidden-left');
+            pagePreview.classList.add('active');
+        });
+
+        // ========== 上传页：Continue 按钮 ==========
+        const btnCreateFinal = document.getElementById('btn-create-final');
+
+        // ========== 上传页 → 结果页 (Continue) ==========
+        const pageResult = document.getElementById('page-result');
+        
+        btnCreateFinal.addEventListener('click', () => {
+            pageUpload.classList.remove('active');
+            pageUpload.classList.add('hidden-left');
+            pageResult.classList.remove('hidden-right');
+            pageResult.classList.add('active');
+        });
+
+        // ========== 结果页 → 引导页 (Continue) ==========
+        const pageGuide = document.getElementById('page-guide');
+        const btnContinueResult = document.getElementById('btn-continue-result');
+
+        btnContinueResult.addEventListener('click', () => {
+            pageResult.classList.remove('active');
+            pageResult.classList.add('hidden-left');
+            pageGuide.classList.remove('hidden-right');
+            pageGuide.classList.add('active');
+        });
+
+        // ========== 引导页滑动检测 ==========
+        const guideScrollContainer = document.getElementById('guide-scroll-container');
+        const guideDots = [
+            document.getElementById('guide-dot-0'),
+            document.getElementById('guide-dot-1'),
+            document.getElementById('guide-dot-2')
+        ];
+        const btnDoneGuide = document.getElementById('btn-done-guide');
+        const btnSkipGuide = document.getElementById('btn-skip-guide');
+
+        guideScrollContainer.addEventListener('scroll', () => {
+            const scrollLeft = guideScrollContainer.scrollLeft;
+            const width = guideScrollContainer.offsetWidth;
+            const currentPage = Math.round(scrollLeft / width);
+            
+            // 更新指示点
+            guideDots.forEach((dot, index) => {
+                if (index === currentPage) {
+                    dot.classList.add('bg-yellow-400');
+                    dot.classList.remove('bg-white/30');
+                    dot.style.width = '24px';
+                } else {
+                    dot.classList.remove('bg-yellow-400');
+                    dot.classList.add('bg-white/30');
+                    dot.style.width = '8px';
+                }
+            });
+
+            // 最后一页启用 Done 按钮
+            if (currentPage === 2) {
+                btnDoneGuide.disabled = false;
+                btnDoneGuide.classList.remove('opacity-50');
+            } else {
+                btnDoneGuide.disabled = true;
+                btnDoneGuide.classList.add('opacity-50');
+            }
+        });
+
+        // ========== 引导页 → 首页 (Done / Skip) ==========
+        function goToHome() {
+            pageGuide.classList.remove('active');
+            pageGuide.classList.add('hidden-right');
+            pageResult.classList.remove('hidden-left', 'active');
+            pageResult.classList.add('hidden-right');
+            pageUpload.classList.remove('hidden-left', 'active');
+            pageUpload.classList.add('hidden-right');
+            pagePreview.classList.remove('hidden-left', 'active');
+            pagePreview.classList.add('hidden-right');
+            pageHome.classList.remove('hidden-left');
+            pageHome.classList.add('active');
+            annotationsHome.style.display = 'block';
+
+            // 重置引导页滚动位置
+            guideScrollContainer.scrollLeft = 0;
+        }
+
+        btnDoneGuide.addEventListener('click', () => {
+            if (!btnDoneGuide.disabled) {
+                goToHome();
+            }
+        });
+
+        btnSkipGuide.addEventListener('click', goToHome);
+
+        // ========== 首页动画自动轮播 (2.0版本) ==========
+        const totalHomeAnimations = 6;
+        let homeCurrentIndex = 0;
+
+        function switchHomeAnimation() {
+            // 隐藏当前动画
+            document.getElementById(`home-anim-${homeCurrentIndex}`).classList.remove('active');
+            document.getElementById(`home-dot-${homeCurrentIndex}`).classList.remove('active');
+
+            // 切换到下一个
+            homeCurrentIndex = (homeCurrentIndex + 1) % totalHomeAnimations;
+
+            // 显示新动画
+            const nextAnim = document.getElementById(`home-anim-${homeCurrentIndex}`);
+            nextAnim.classList.add('active');
+            nextAnim.classList.add('bounce-in');
+            setTimeout(() => nextAnim.classList.remove('bounce-in'), 500);
+
+            document.getElementById(`home-dot-${homeCurrentIndex}`).classList.add('active');
+        }
+
+        // 每3秒自动切换
+        setInterval(switchHomeAnimation, 3000);
+
+        // ========== 实时时间更新 ==========
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        function updateWidgetTime() {
+            const now = new Date();
+            document.getElementById('widget-year').textContent = now.getFullYear();
+            document.getElementById('widget-month').textContent = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('widget-day').textContent = String(now.getDate()).padStart(2, '0');
+            document.getElementById('widget-hour').textContent = String(now.getHours()).padStart(2, '0');
+            document.getElementById('widget-minute').textContent = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('widget-weekday').textContent = weekdays[now.getDay()];
+        }
+        
+        // 初始化时间并每秒更新
+        updateWidgetTime();
+        setInterval(updateWidgetTime, 1000);
+
+        // ========== 预览页：1:1动画轮播 + 4:2联动预览 ==========
+        const animationCarousel = document.getElementById('animation-carousel');
+        const cardCenter = document.getElementById('card-center');
+        const carouselDots = document.getElementById('carousel-dots');
+        const widgetPreview = document.getElementById('widget-preview');
+        const btnPreviewCreate = document.getElementById('btn-preview-create');
+
+        let currentAnimIndex = 0;
+        let carouselStartX = 0;
+        let carouselCurrentX = 0;
+        let isCarouselDragging = false;
+        let isAnimating = false; // 防止动画期间交互
+
+        // 动画数据（6种动画）
+        const animationData = [
+            { name: 'Stretch', emoji: '🐕', anim: 'animate-stretch', extra: null, time: { h: 8, min: 30 }, weekday: 'Tue' },
+            { name: 'Sock Thief', emoji: '🐕', anim: 'animate-wag', extra: '🧦', extraPos: 'top-right', time: { h: 9, min: 15 }, weekday: 'Tue' },
+            { name: 'Hungry', emoji: '🐕', anim: 'animate-bob', extra: '🍚', extraPos: 'bottom-right', time: { h: 12, min: 0 }, weekday: 'Tue' },
+            { name: 'Oops!', emoji: '🐕', anim: 'animate-look-back', extra: '💩', extraPos: 'bottom-left', time: { h: 14, min: 45 }, weekday: 'Tue' },
+            { name: 'Digging', emoji: '🐕', anim: 'animate-dig', extra: '💨', extraPos: 'bottom', time: { h: 16, min: 20 }, weekday: 'Tue' },
+            { name: 'Butterfly', emoji: '🐕', anim: 'animate-chase', extra: '🦋', extraPos: 'top-right-far', time: { h: 18, min: 0 }, weekday: 'Tue' }
+        ];
+
+        // 生成1:1动画卡片HTML（更大更清晰的展示）
+        function createAnimCardHTML(data) {
+            const { name, emoji, anim, extra, extraPos } = data;
+            
+            let extraHTML = '';
+            if (extra) {
+                if (extraPos === 'top-right') extraHTML = `<div class="absolute -right-6 top-2 text-5xl transform rotate-12">${extra}</div>`;
+                else if (extraPos === 'bottom-right') extraHTML = `<div class="absolute -right-4 bottom-2 text-5xl">${extra}</div>`;
+                else if (extraPos === 'bottom-left') extraHTML = `<div class="absolute -left-4 bottom-2 text-5xl">${extra}</div>`;
+                else if (extraPos === 'bottom') extraHTML = `<div class="absolute bottom-2 left-1/2 -translate-x-1/2 text-4xl">${extra}</div>`;
+                else if (extraPos === 'top-right-far') extraHTML = `<div class="absolute -right-10 -top-6 text-5xl animate-flutter">${extra}</div>`;
+            }
+
+            return `
+                <div class="absolute inset-0 opacity-30 pointer-events-none">
+                    <div class="absolute top-8 left-8 w-24 h-24 bg-yellow-400/50 rounded-full blur-3xl"></div>
+                    <div class="absolute bottom-8 right-8 w-20 h-20 bg-orange-400/40 rounded-full blur-3xl"></div>
+                </div>
+                <div class="relative mb-3">
+                    <div class="text-[100px] leading-none ${anim} select-none">${emoji}</div>
+                    ${extraHTML}
+                </div>
+                <div class="text-lg font-bold text-white tracking-wide">${name}</div>
+            `;
+        }
+
+        // 生成4:2 Widget预览HTML
+        function createWidgetPreviewHTML(data) {
+            const { emoji, anim, extra, extraPos, time, weekday } = data;
+            
+            let extraHTML = '';
+            if (extra) {
+                if (extraPos === 'top-right') extraHTML = `<div class="absolute -right-2 top-0 text-xl transform rotate-12">${extra}</div>`;
+                else if (extraPos === 'bottom-right') extraHTML = `<div class="absolute -right-1 bottom-0 text-2xl">${extra}</div>`;
+                else if (extraPos === 'bottom-left') extraHTML = `<div class="absolute -left-1 bottom-0 text-xl">${extra}</div>`;
+                else if (extraPos === 'bottom') extraHTML = `<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 text-base">${extra}</div>`;
+                else if (extraPos === 'top-right-far') extraHTML = `<div class="absolute -right-3 -top-2 text-xl animate-flutter">${extra}</div>`;
+            }
+
+            return `
+                <div class="card-left">
+                    <div class="absolute inset-0 opacity-20">
+                        <div class="absolute top-3 left-3 w-12 h-12 bg-yellow-400/40 rounded-full blur-2xl"></div>
+                        <div class="absolute bottom-3 right-3 w-10 h-10 bg-orange-400/30 rounded-full blur-2xl"></div>
+                    </div>
+                    <div class="relative">
+                        <div class="text-5xl ${anim} select-none">${emoji}</div>
+                        ${extraHTML}
+                    </div>
+                </div>
+                <div class="card-right">
+                    <div class="absolute inset-0 opacity-15">
+                        <div class="absolute top-4 right-4 w-14 h-14 bg-blue-400/30 rounded-full blur-2xl"></div>
+                    </div>
+                    <div class="relative text-center">
+                        <div class="text-white/50 text-[9px] font-medium tracking-wider mb-0.5">2024.12.24</div>
+                        <div class="flex items-baseline gap-0.5 justify-center">
+                            <span class="text-3xl font-bold text-white tracking-tight">${String(time.h).padStart(2, '0')}</span>
+                            <span class="text-xl font-light text-white/60">:</span>
+                            <span class="text-3xl font-bold text-white tracking-tight">${String(time.min).padStart(2, '0')}</span>
+                        </div>
+                        <div class="text-[8px] text-white/40 font-medium uppercase tracking-widest mt-0.5">${weekday}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 渲染轮播
+        function renderCarousel() {
+            // 中间主卡片 - 展示完整动画细节
+            cardCenter.innerHTML = createAnimCardHTML(animationData[currentAnimIndex]);
+            
+            // 更新4:2 Widget预览（联动）
+            widgetPreview.innerHTML = createWidgetPreviewHTML(animationData[currentAnimIndex]);
+            
+            // 更新指示点
+            renderCarouselDots();
+        }
+
+        // 渲染指示点
+        function renderCarouselDots() {
+            carouselDots.innerHTML = '';
+            carouselDots.className = 'flex gap-1.5';
+            animationData.forEach((_, i) => {
+                const dot = document.createElement('div');
+                dot.className = `carousel-dot ${i === currentAnimIndex ? 'active' : ''}`;
+                dot.addEventListener('click', () => {
+                    currentAnimIndex = i;
+                    renderCarousel();
+                });
+                carouselDots.appendChild(dot);
+            });
+        }
+
+        // 轮播拖拽
+        cardCenter.addEventListener('mousedown', startCarouselDrag);
+        cardCenter.addEventListener('touchstart', startCarouselDrag, { passive: true });
+
+        function startCarouselDrag(e) {
+            // 动画进行中或不在预览页时不允许拖拽
+            if (isAnimating) return;
+            if (!pagePreview.classList.contains('active')) return;
+            
+            isCarouselDragging = true;
+            carouselStartX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            carouselCurrentX = carouselStartX; // 初始化当前位置
+            cardCenter.classList.add('dragging');
+        }
+
+        document.addEventListener('mousemove', moveCarouselDrag);
+        document.addEventListener('touchmove', moveCarouselDrag, { passive: false });
+
+        function moveCarouselDrag(e) {
+            // 只有在预览页且正在拖拽时才处理
+            if (!isCarouselDragging || isAnimating) return;
+            
+            // 只有当预览页是活动状态时才阻止默认行为
+            if (!pagePreview.classList.contains('active')) return;
+            
+            e.preventDefault();
+            carouselCurrentX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const diffX = carouselCurrentX - carouselStartX;
+            const scale = Math.max(0.9, 1 - Math.abs(diffX) * 0.001);
+            cardCenter.style.transform = `translateX(${diffX}px) scale(${scale})`;
+        }
+
+        document.addEventListener('mouseup', endCarouselDrag);
+        document.addEventListener('touchend', endCarouselDrag);
+
+        function endCarouselDrag() {
+            if (!isCarouselDragging || isAnimating) return;
+            isCarouselDragging = false;
+            cardCenter.classList.remove('dragging');
+            
+            const diffX = carouselCurrentX - carouselStartX;
+            const threshold = 50;
+            const total = animationData.length;
+
+            // 重置 transform
+            cardCenter.style.transform = '';
+
+            if (diffX > threshold) {
+                // 向右滑 → 上一个（卡片向右飞走，左边书页跟上）
+                isAnimating = true;
+                cardCenter.classList.add('fly-right');
+                animationCarousel.classList.add('book-pages-follow-right');
+                
+                setTimeout(() => {
+                    currentAnimIndex = (currentAnimIndex - 1 + total) % total;
+                    cardCenter.classList.remove('fly-right');
+                    animationCarousel.classList.remove('book-pages-follow-right');
+                    cardCenter.classList.add('fly-in-from-left');
+                    renderCarousel();
+                    
+                    setTimeout(() => {
+                        cardCenter.classList.remove('fly-in-from-left');
+                        isAnimating = false;
+                    }, 400);
+                }, 300);
+                
+            } else if (diffX < -threshold) {
+                // 向左滑 → 下一个（卡片向左飞走，右边书页跟上）
+                isAnimating = true;
+                cardCenter.classList.add('fly-left');
+                animationCarousel.classList.add('book-pages-follow-left');
+                
+                setTimeout(() => {
+                    currentAnimIndex = (currentAnimIndex + 1) % total;
+                    cardCenter.classList.remove('fly-left');
+                    animationCarousel.classList.remove('book-pages-follow-left');
+                    cardCenter.classList.add('fly-in-from-right');
+                    renderCarousel();
+                    
+                    setTimeout(() => {
+                        cardCenter.classList.remove('fly-in-from-right');
+                        isAnimating = false;
+                    }, 400);
+                }, 300);
+            }
+            
+            // 重置位置变量
+            carouselStartX = 0;
+            carouselCurrentX = 0;
+        }
+
+        // Create 按钮跳转到上传页
+        btnPreviewCreate.addEventListener('click', () => showPage(pageUpload, 'left'));
+
+        // 初始化轮播
+        renderCarousel();
+
+        // ========== 底部 Tab 切换 ==========
+        const pageProfile = document.getElementById('page-profile');
+        const tabWallpaper = document.getElementById('tab-wallpaper');
+        const tabDiscovered = document.getElementById('tab-discovered');
+        const tabProfile = document.getElementById('tab-profile');
+
+        // Profile 页面的底部 Tab
+        const profileTabWallpaper = document.getElementById('profile-tab-wallpaper');
+        const profileTabDiscovered = document.getElementById('profile-tab-discovered');
+        const profileTabProfileBtn = document.getElementById('profile-tab-profile-btn');
+
+        // 更新首页底部 Tab 状态
+        function updateHomeTabs(activeTab) {
+            [tabWallpaper, tabDiscovered, tabProfile].forEach(tab => {
+                tab.classList.remove('text-yellow-400');
+                tab.classList.add('text-gray-500');
+                const svg = tab.querySelector('svg');
+                // Wallpaper 图标需要 fill，其他用 stroke
+                if (tab === tabWallpaper) {
+                    svg.setAttribute('fill', 'currentColor');
+                } else {
+                    svg.setAttribute('fill', 'none');
+                }
+            });
+            activeTab.classList.remove('text-gray-500');
+            activeTab.classList.add('text-yellow-400');
+            const activeSvg = activeTab.querySelector('svg');
+            if (activeTab === tabWallpaper || activeTab === tabProfile) {
+                activeSvg.setAttribute('fill', 'currentColor');
+            }
+        }
+
+        // 更新 Profile 页面底部 Tab 状态
+        function updateProfileTabs(activeTab) {
+            [profileTabWallpaper, profileTabDiscovered, profileTabProfileBtn].forEach(tab => {
+                tab.classList.remove('text-yellow-400');
+                tab.classList.add('text-gray-500');
+                const svg = tab.querySelector('svg');
+                // Wallpaper 图标需要 fill，其他用 stroke
+                if (tab === profileTabWallpaper) {
+                    svg.setAttribute('fill', 'currentColor');
+                } else if (tab === profileTabProfileBtn) {
+                    svg.setAttribute('fill', 'none');
+                }
+            });
+            activeTab.classList.remove('text-gray-500');
+            activeTab.classList.add('text-yellow-400');
+            const activeSvg = activeTab.querySelector('svg');
+            if (activeTab === profileTabWallpaper || activeTab === profileTabProfileBtn) {
+                activeSvg.setAttribute('fill', 'currentColor');
+            }
+        }
+
+        // 首页 → Profile 页
+        tabProfile.addEventListener('click', () => {
+            pageHome.classList.remove('active');
+            pageHome.classList.add('hidden-left');
+            pageProfile.classList.remove('hidden-right');
+            pageProfile.classList.add('active');
+            annotationsHome.style.display = 'none';
+            updateHomeTabs(tabProfile);
+            updateProfileTabs(profileTabProfileBtn);
+        });
+
+        // Profile 页 → 首页 (点击 Wallpaper)
+        profileTabWallpaper.addEventListener('click', () => {
+            pageProfile.classList.remove('active');
+            pageProfile.classList.add('hidden-right');
+            pageHome.classList.remove('hidden-left');
+            pageHome.classList.add('active');
+            annotationsHome.style.display = 'block';
+            updateHomeTabs(tabWallpaper);
+        });
+
+        // Profile 页 → Discovered (暂时返回首页)
+        profileTabDiscovered.addEventListener('click', () => {
+            pageProfile.classList.remove('active');
+            pageProfile.classList.add('hidden-right');
+            pageHome.classList.remove('hidden-left');
+            pageHome.classList.add('active');
+            annotationsHome.style.display = 'block';
+            updateHomeTabs(tabDiscovered);
+        });
+
+        // 首页 Tab 点击（保持在首页，只切换高亮）
+        tabWallpaper.addEventListener('click', () => {
+            updateHomeTabs(tabWallpaper);
+        });
+
+        tabDiscovered.addEventListener('click', () => {
+            updateHomeTabs(tabDiscovered);
+        });
+
+        // ========== Widget 详情页 ==========
+        const pageWidgetDetail = document.getElementById('page-widget-detail');
+        const widgetCompletedItem = document.getElementById('widget-completed-item');
+        const btnBackWidgetDetail = document.getElementById('btn-back-widget-detail');
+
+        // Profile 页 → Widget 详情页
+        widgetCompletedItem.addEventListener('click', () => {
+            pageProfile.classList.remove('active');
+            pageProfile.classList.add('hidden-left');
+            pageWidgetDetail.classList.remove('hidden-right');
+            pageWidgetDetail.classList.add('active');
+        });
+
+        // Widget 详情页 → Profile 页
+        btnBackWidgetDetail.addEventListener('click', () => {
+            pageWidgetDetail.classList.remove('active');
+            pageWidgetDetail.classList.add('hidden-right');
+            pageProfile.classList.remove('hidden-left');
+            pageProfile.classList.add('active');
+        });
+
+        // ========== Widget 详情页图片切换 ==========
+        const widgetDetailGallery = document.getElementById('widget-detail-gallery');
+        let currentDetailImg = 1;
+        const totalDetailImgs = 4;
+
+        widgetDetailGallery.addEventListener('click', () => {
+            // 隐藏当前图片
+            document.getElementById(`detail-img-${currentDetailImg}`).classList.remove('opacity-100');
+            document.getElementById(`detail-img-${currentDetailImg}`).classList.add('opacity-0');
+            document.getElementById(`detail-dot-${currentDetailImg}`).classList.remove('bg-yellow-400');
+            document.getElementById(`detail-dot-${currentDetailImg}`).classList.add('bg-white/40');
+
+            // 切换到下一张
+            currentDetailImg = currentDetailImg % totalDetailImgs + 1;
+
+            // 显示新图片
+            document.getElementById(`detail-img-${currentDetailImg}`).classList.remove('opacity-0');
+            document.getElementById(`detail-img-${currentDetailImg}`).classList.add('opacity-100');
+            document.getElementById(`detail-dot-${currentDetailImg}`).classList.remove('bg-white/40');
+            document.getElementById(`detail-dot-${currentDetailImg}`).classList.add('bg-yellow-400');
+        });
+
+        // ========== 点赞/踩 交互 ==========
+        const btnLikeWidget = document.getElementById('btn-like-widget');
+        const btnDislikeWidget = document.getElementById('btn-dislike-widget');
+
+        btnLikeWidget.addEventListener('click', (e) => {
+            e.stopPropagation();
+            btnLikeWidget.classList.toggle('text-yellow-400');
+            btnLikeWidget.classList.toggle('bg-yellow-400/20');
+            btnDislikeWidget.classList.remove('text-yellow-400', 'bg-yellow-400/20');
+        });
+
+        btnDislikeWidget.addEventListener('click', (e) => {
+            e.stopPropagation();
+            btnDislikeWidget.classList.toggle('text-yellow-400');
+            btnDislikeWidget.classList.toggle('bg-yellow-400/20');
+            btnLikeWidget.classList.remove('text-yellow-400', 'bg-yellow-400/20');
+        });
+    </script>
+</body>
+</html>
